@@ -1,16 +1,21 @@
 {
   "name": "jev-cu",
-  "version": "0.2.0",
-  "description": "Jev 1.13（OpenRouter Decisions API）决策 + Codex Computer Use 执行：skill 与运行循环",
+  "version": "0.3.0",
+  "description": "OpenRouter Jev 1.13 with native Windows computer use and legacy Codex AX runtime",
   "private": true,
+  "type": "module",
+  "engines": { "node": ">=22" },
   "scripts": {
     "p0": "node scripts/p0-eval.mjs",
-    "test": "node --test tests/core.test.mjs tests/openrouter.test.mjs",
+    "test": "node --test",
     "install-skill": "node scripts/install-skill.mjs",
-    "uninstall-skill": "node scripts/install-skill.mjs --uninstall"
+    "uninstall-skill": "node scripts/install-skill.mjs --uninstall",
+    "windows:doctor": "node windows/cli.mjs doctor",
+    "windows:mcp": "node windows/cli.mjs mcp",
+    "windows:test": "node --test windows/desktop.test.mjs windows/native.test.mjs",
+    "windows:install": "node windows/install.mjs"
   },
   "keywords": [],
   "author": "",
-  "license": "ISC",
-  "type": "module"
+  "license": "ISC"
 }
