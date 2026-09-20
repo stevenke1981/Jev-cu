@@ -60,7 +60,7 @@ test("default provider is OpenRouter Decisions with pinned Jev 1.13", () => {
 test("OPENROUTER_API_KEY environment takes precedence over .env.local", () => {
   withKeyEnvironment({ OPENROUTER_API_KEY: `  ${TEST_KEY}  `, TYPESAFE_API_KEY: "old-key" }, () => {
     withEnvFile('OPENROUTER_API_KEY="file-key"\n', envFile => {
-      assert.equal(loadApiKey({ envFile }), TEST_KEY);
+      assert.equal(loadApiKey({ envFile, configFile: null }), TEST_KEY);
     });
   });
 });
@@ -69,7 +69,7 @@ test("quoted .env.local key supports BOM, CRLF and blank environment", () => {
   withKeyEnvironment({ OPENROUTER_API_KEY: "   " }, () => {
     for (const quote of ['"', "'"]) {
       withEnvFile(`\uFEFF# local configuration\r\nOPENROUTER_API_KEY=${quote}${TEST_KEY}${quote}\r\n`, envFile => {
-        assert.equal(loadApiKey({ envFile }), TEST_KEY);
+        assert.equal(loadApiKey({ envFile, configFile: null }), TEST_KEY);
       });
     }
   });
@@ -78,7 +78,7 @@ test("quoted .env.local key supports BOM, CRLF and blank environment", () => {
 test("legacy TypeSafe credentials are never an automatic fallback", () => {
   withKeyEnvironment({ TYPESAFE_API_KEY: "legacy-secret" }, () => {
     withEnvFile("TYPESAFE_API_KEY=legacy-file-secret\n", envFile => {
-      assert.throws(() => loadApiKey({ envFile }), /未找到 OPENROUTER_API_KEY/);
+      assert.throws(() => loadApiKey({ envFile, configFile: null }), /未找到 OPENROUTER_API_KEY/);
     });
   });
 });
@@ -87,7 +87,7 @@ test("missing or empty OpenRouter credentials fail locally", () => {
   withKeyEnvironment({}, () => {
     for (const content of [null, "OPENROUTER_API_KEY=\n", 'OPENROUTER_API_KEY="   "\n']) {
       withEnvFile(content, envFile => {
-        assert.throws(() => loadApiKey({ envFile }), /未找到 OPENROUTER_API_KEY/);
+        assert.throws(() => loadApiKey({ envFile, configFile: null }), /未找到 OPENROUTER_API_KEY/);
       });
     }
   });
@@ -97,6 +97,20 @@ test("blank explicit API key does not send a request", async () => {
   let calls = 0;
   await assert.rejects(request({ apiKey: " \t ", fetchImpl: async () => { calls++; return ok(); } }), /OPENROUTER_API_KEY/);
   assert.equal(calls, 0);
+});
+
+test('network permission denial is distinguished from authentication and never retried', async () => {
+  let calls = 0;
+  await assert.rejects(request({ fetchImpl: async () => {
+    calls++;
+    throw new TypeError('fetch failed', { cause: Object.assign(new AggregateError([]), { code: 'EACCES' }) });
+  } }), err => {
+    assert.equal(err.code, 'NETWORK_ACCESS_DENIED');
+    assert.match(err.message, /不是 API key 驗證結果/);
+    assert.ok(!err.message.includes(TEST_KEY));
+    return true;
+  });
+  assert.equal(calls, 1);
 });
 
 test("ask sends Bearer auth and state/questions, not Chat Completions messages", async () => {

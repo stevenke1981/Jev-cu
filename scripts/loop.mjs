@@ -69,7 +69,18 @@ const CLICKABLE_ROLES = new Set([
   "date time area",  // Calendar 日期/时间选择器（ID: start-datepicker / start-timepicker 等）
 ]);
 
-/** 把 AX 文本解析成元素列表：{index, role, label, depth, raw} */
+// Official Windows role names are localized; preserve original labels and indexes.
+const LOCALIZED_ROLES = {
+  '可選取的分割按鈕': 'pop up button', '應用程式列按鈕': 'button',
+  '功能表項目': 'menu item', '選項按鈕': 'radio button',
+  '下拉式方塊': 'combo box', '清單項目': 'list',
+  '按鈕': 'button', '編輯': 'text field', '文字': 'text',
+  '視窗': 'standard window', '窗格': 'container', '群組': 'container',
+  '清單': 'list', '核取方塊': 'checkbox', '索引標籤': 'tab',
+};
+const SOURCE_ROLES = [...Object.keys(LOCALIZED_ROLES), ...ROLES].sort((a, b) => b.length - a.length);
+
+/** 把 AX 文本解析成元素列表：{index, role, label, depth, raw, disabled} */
 export function parseAX(axText) {
   const out = [];
   for (const line of String(axText ?? "").split("\n")) {
@@ -77,15 +88,17 @@ export function parseAX(axText) {
     if (!m) continue;
     const depth = m[1].replace(/\t/g, "    ").length;
     const rest = m[3].trim();
-    const role = ROLES.find((r) => rest === r || rest.startsWith(r + " ")) ?? rest.split(" ")[0];
+    const sourceRole = SOURCE_ROLES.find((r) => rest === r || rest.startsWith(r + " ")) ?? rest.split(" ")[0];
+    const role = LOCALIZED_ROLES[sourceRole] ?? sourceRole;
     // 清掉 AX 元数据尾巴（如 "Secondary Actions: Move next, Remove from toolbar"），
     // 它描述的是元素的次级动作列表，不是元素名称；保留会污染标签并误触敏感词门。
     const label = rest
-      .slice(role.length)
+      .slice(sourceRole.length)
       .trim()
       .replace(/,?\s*Secondary Actions:.*$/i, "")
       .trim();
-    out.push({ index: Number(m[2]), role, label, depth, raw: line });
+    const flags = label.match(/^\(([^)]*)\)/)?.[1]?.split(",").map((flag) => flag.trim());
+    out.push({ index: Number(m[2]), role, label, depth, raw: line, disabled: flags?.includes("disabled") ?? false });
   }
   return out;
 }
@@ -102,6 +115,7 @@ export function selectCandidates(elements, goal = "", { max = 40 } = {}) {
 
   const scored = [];
   for (const el of elements) {
+    if (el.disabled) continue;
     if (!CLICKABLE_ROLES.has(el.role)) continue;
     let score = 0;
     if (["button", "toggle button", "radio button", "menu item", "pop up button", "combo box"].includes(el.role)) score += 3;
@@ -135,7 +149,8 @@ export function buildContext(axText, { maxTextLines = 6 } = {}) {
     .map((l) => l.trim())
     .filter(Boolean);
   const head = lines.slice(0, 2);
-  const texts = lines.filter((l) => /^\d+\s+text\b/.test(l)).slice(0, maxTextLines);
+  const texts = parseAX(axText).filter((el) => el.role === "text")
+    .slice(0, maxTextLines).map((el) => el.raw.trim());
   const focus = lines.find((l) => /focused UI element/i.test(l));
   return [...head, ...texts, focus].filter(Boolean).join("\n").slice(0, 1_500);
 }

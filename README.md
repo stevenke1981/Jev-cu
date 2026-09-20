@@ -1,4 +1,6 @@
-# Jev-cu v0.5.0 — GPT + ChatGPT 桌面版 Computer Use
+# Jev-cu v0.6.0 — GPT + ChatGPT 桌面版 Computer Use
+
+v0.6.0 新增安裝時的本機金鑰設定與自動讀取，清楚區分網路拒絕與金鑰驗證；並修正 Windows 繁體中文控制項解析：保留原始元素編號與標籤、排除停用控制項，並將中文文字狀態納入 Jev 上下文。涵蓋小畫家實機觀察到的角色；不代表所有語系均已支援。
 
 v0.5.0 新增目前 Windows 官方 `@oai/sky` 介面：精確選取單一視窗、直接讀取官方文字樹、依原有 Jev 四問與 Policy 提出一步，再由 GPT 在下一次工具呼叫執行並驗收。`runChatGPTTask({ sky, ... })` 預設只預覽；`dryRun:false` 回傳 `awaiting_review`，檢視後以 `executeWindowsStep(proposal)` 執行一次。使用範例見 [runtime.md](skill/jev-use/references/runtime.md)。原 `cua` 入口保留。
 
@@ -34,7 +36,7 @@ flowchart TD
 
 1. 在 ChatGPT 桌面版使用 GPT，進入 ChatGPT Work，安裝／啟用官方 Computer Use 的 server 與 skill，依官方流程授權目標 App。
 2. 將本 repository 作為本機專案資料夾開啟。Node.js 22+；沒有其他 npm 依賴。
-3. 在 repository 根目錄 `.env.local` 設定 `OPENROUTER_API_KEY`，不要貼到對話、日誌或提交 Git。這是 **Jev** 的金鑰，不是用 API 取代桌面版 GPT。
+3. 將根目錄 [`.env.example`](.env.example) 複製成 `.env.local`，在 `.env.local` 的 `OPENROUTER_API_KEY=` 後填入金鑰。`.env.example` 是會上傳 GitHub 的空白模板，真實金鑰只填入已排除 Git 追蹤的 `.env.local`。這是 **Jev** 的金鑰，不是用 API 取代桌面版 GPT。
 
 ```powershell
 # 已在本專案 main 分支時
@@ -44,7 +46,11 @@ npm run doctor
 npm run install-skill -- --force
 ```
 
-安裝器只複製本專案 Skill 到 `~/.agents/skills/jev-use`，先備份到搜尋範圍以外的 `~/.agents/skill-backups`，不安裝官方插件、不修改任何權限／MCP 設定或金鑰。若偵測到舊 `~/.codex/skills/jev-use`，會回報但不擅自刪除；請在桌面版停用重複舊版。若目前 ChatGPT Work 不顯示本機 Skill，直接在已開啟的本機專案要求 GPT 讀取 `AGENTS.md` 與 `skill/jev-use/SKILL.md`，不要改用其他代理。
+安裝器複製 Skill 到 `~/.agents/skills/jev-use`，先備份到 `~/.agents/skill-backups`；並將專案 `.env.local` 的單一 `OPENROUTER_API_KEY` 匯入 `~/.agents/jev-cu/.env`。Windows 路徑是 `%USERPROFILE%\.agents\jev-cu\.env`。Skill 只記錄設定檔路徑，不含金鑰；執行程式會自行讀取，不需要將金鑰載入對話。設定檔位於專案和 Skill 備份之外；Unix 新檔案使用 0600，Windows 使用父資料夾的存取權限。這不會修改宿主權限、MCP 設定或安裝官方插件。
+
+沒有專案金鑰時，安裝器會建立空白的本機設定檔並回報 `configured:false`，可直接填寫該檔案。已有本機設定預設保留，`--force` 也不覆寫金鑰；要從更新後的專案 `.env.local` 換入新金鑰，執行 `npm run install-skill -- --force --update-key`。移除 Skill 時保留設定檔。讀取順序為環境變數 → 專案 `.env.local` → 本機設定；更新金鑰時請留意較高優先序的舊值。
+
+若偵測到舊 `~/.codex/skills/jev-use`，會回報但不擅自刪除。若目前桌面會話不顯示本機 Skill，直接在本機專案要求 GPT 讀取 `AGENTS.md` 與 `skill/jev-use/SKILL.md`。
 
 ```dotenv
 OPENROUTER_API_KEY=your_openrouter_api_key
@@ -75,6 +81,8 @@ Windows 官方 Computer Use 需前景且目標 App 可見。macOS 按官方要�
 本機舊 MCP 設定不會被 git pull 自動更改：請停用之前的自製 `jev-windows` server 與其 Skill，避免它繼續被載入；**保留官方 Computer Use 插件**。不要再套用舊的 Windows v1.1.0 修正包到本版。本專案不代為修改宿主設定或你的其他專案。
 
 ## 測試與限制
+
+實機檢查（2026-09-20）：Windows 繁體中文小畫家可啟動並讀取控制項；修正前候選不足，修正後可以產生候選。這次官方 runtime 對 OpenRouter 連線回報 `EACCES`，尚未完成 Jev 真實決策與操作的端到端驗收。金鑰存在不表示連線或金鑰有效。遇到這類錯誤應停止該決策步驟，交回 GPT 說明限制；不得改用其他網路通道繞過宿主限制。
 
 `npm test` 只跑離線測試：原四問／Policy／迴圈、官方 runtime adapter mock、GPT 入口完整流程 mock、安裝備份。它不操作真實桌面、不呼叫付費模型；跨平台 CI 通過也不表示真實 ChatGPT Work、CapCut 或每個 OS 的 runtime 已端到端驗收。
 

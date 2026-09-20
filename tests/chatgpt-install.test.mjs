@@ -9,13 +9,15 @@ function fixture(fn) {
   const root = path.join(dir, 'repo with spaces'), home = path.join(dir, 'home');
   fs.mkdirSync(path.join(root, 'skill/jev-use/references'), { recursive: true });
   fs.writeFileSync(path.join(root, 'skill/jev-use/SKILL.md'), '---\nname: jev-use\n---\n{{REPO_DIR}}');
-  fs.writeFileSync(path.join(root, 'skill/jev-use/references/runtime.md'), '{{REPO_DIR}}');
+  fs.writeFileSync(path.join(root, 'skill/jev-use/references/runtime.md'), '{{REPO_DIR}} {{CONFIG_ENV_FILE}}');
   try { return fn({ root, home }); } finally { fs.rmSync(dir, { recursive: true, force: true }); }
 }
-test('installer replaces templates and touches only local skill files', () => fixture(opts => {
+test('installer renders repository and credential paths without changing host settings', () => fixture(opts => {
   const r = installSkill(opts); assert.equal(r.installed, true); assert.equal(r.legacySkillDetected, false);
   assert.equal(fs.readFileSync(path.join(r.destination, 'SKILL.md'), 'utf8').includes('{{REPO_DIR}}'), false);
   assert.equal(fs.existsSync(path.join(opts.home, '.codex/config.toml')), false);
+  assert.equal(fs.existsSync(r.credentials.path), true);
+  assert.ok(fs.readFileSync(path.join(r.destination, 'references/runtime.md'), 'utf8').includes(r.credentials.path.replaceAll('\\', '/')));
 }));
 test('installer refuses implicit overwrite', () => fixture(opts => { installSkill(opts); assert.throws(() => installSkill(opts), /exists/); }));
 test('forced update archives old version outside skill discovery', () => fixture(opts => {
@@ -25,4 +27,18 @@ test('forced update archives old version outside skill discovery', () => fixture
 }));
 test('uninstall archives rather than erases an installed skill', () => fixture(opts => {
   installSkill(opts); const r = installSkill({ ...opts, uninstall: true }); assert.equal(r.installed, false); assert.ok(fs.existsSync(r.backup)); assert.equal(fs.existsSync(r.destination), false);
+  assert.equal(fs.existsSync(r.credentials.path), true);
+}));
+
+test('skill installation and backups never include credentials', () => fixture(opts => {
+  fs.writeFileSync(path.join(opts.root, '.env.local'), 'OPENROUTER_API_KEY=private-test-key\n');
+  installSkill(opts);
+  const result = installSkill({ ...opts, force: true });
+  for (const dir of [result.destination, result.backup]) {
+    for (const file of fs.readdirSync(dir, { recursive: true })) {
+      const full = path.join(dir, file);
+      if (fs.statSync(full).isFile()) assert.ok(!fs.readFileSync(full, 'utf8').includes('private-test-key'));
+    }
+  }
+  assert.ok(!JSON.stringify(result).includes('private-test-key'));
 }));

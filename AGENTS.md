@@ -1,4 +1,4 @@
-# Jev-cu project contract — v0.5.0
+# Jev-cu project contract — v0.6.0
 
 Use GPT in the current ChatGPT desktop session as the sole planner and owner. Read skill/jev-use/SKILL.md and the current official Computer Use tool documentation before desktop actions.
 

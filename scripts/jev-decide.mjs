@@ -13,6 +13,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { configEnvFile, readEnvKey } from './credentials.mjs';
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -24,23 +25,16 @@ export const PRICE_PER_INPUT_TOKEN_USD = 0.042 / 1e6;
 export function loadApiKey({
   envVar = "OPENROUTER_API_KEY",
   envFile = path.join(PROJECT_DIR, ".env.local"),
+  configFile = configEnvFile(),
 } = {}) {
   const env = globalThis.process?.env ?? {};
   const envKey = String(env[envVar] ?? "").trim();
   if (envKey) return envKey;
-  try {
-    const text = fs.readFileSync(envFile, "utf8");
-    for (const line of text.split("\n")) {
-      const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-      if (m && m[1] === envVar) {
-        const key = m[2].replace(/^['"]|['"]$/g, "").trim();
-        if (key) return key;
-      }
-    }
-  } catch {
-    /* 文件不存在时走统一报错 */
+  for (const file of [envFile, configFile]) {
+    const key = readEnvKey(file, envVar);
+    if (key) return key;
   }
-  throw new Error(`未找到 ${envVar}：请设置环境变量，或写入 ${envFile}`);
+  throw new Error(`未找到 ${envVar}：请设置环境变量、项目 .env.local 或本机 Jev 设置文件。`);
 }
 
 export function estimateCostUsd(usage = {}) {
@@ -158,6 +152,14 @@ export async function ask({
         if (controller.signal.aborted) throw err;
         return null;
       });
+    } catch (err) {
+      const codes = [err.code, err.cause?.code, ...(err.cause?.errors ?? []).map(item => item.code)];
+      if (codes.some(code => code === 'EACCES' || code === 'EPERM')) {
+        const denied = new Error('OpenRouter 連線被本機執行環境拒絕（EACCES/EPERM），未收到 HTTP 回應；這不是 API key 驗證結果。請檢查宿主網路權限，不要更換通道繞過限制。');
+        denied.code = 'NETWORK_ACCESS_DENIED';
+        throw denied;
+      }
+      throw err;
     } finally {
       clearTimeout(timer);
     }

@@ -1,6 +1,6 @@
 {
   "name": "jev-cu",
-  "version": "0.5.0",
+  "version": "0.6.0",
   "description": "GPT-owned original Jev four-question harness for official ChatGPT desktop Computer Use only",
   "private": true,
   "type": "module",

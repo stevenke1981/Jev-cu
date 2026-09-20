@@ -30,4 +30,4 @@ description: Use Jev target/action/done/risk decisions with GPT and official des
 
 ## 設定與使用
 
-Jev 固定預設 OpenRouter `typesafe/jev-1.13`；`OPENROUTER_API_KEY` 來自環境或專案 `.env.local`。只檢查存在，不顯示值。執行範例見 [runtime.md](references/runtime.md)。安裝後重開桌面工作階段；若本機 Skill 不可被當前模式發現，讓 GPT 在已開啟的本機專案讀此文件，不改用其他模式／代理冒充支援。
+Jev 固定預設 OpenRouter `typesafe/jev-1.13`。金鑰由程式依序讀取環境變數 `OPENROUTER_API_KEY`、專案 `.env.local`、本機 `{{CONFIG_ENV_FILE}}`（原始模板對應 `~/.agents/jev-cu/.env`）。安裝器從專案 `.env.local` 匯入該單一金鑰；已有設定預設保留。不要將金鑰放進 Skill、對話或日誌；不要為檢查存在而印出檔案內容。`doctor` 的 `keyConfigured` 只代表可讀取，不代表有效；`keyValidated:false` 與 `networkTested:false` 表示未測試。`EACCES/EPERM` 是連線權限錯誤，不能推斷金鑰無效，也不得繞過宿主限制。執行範例見 [runtime.md](references/runtime.md)。安裝後重開桌面工作階段；若本機 Skill 不可被當前模式發現，讓 GPT 在已開啟的本機專案讀此文件，不改用其他模式／代理冒充支援。
