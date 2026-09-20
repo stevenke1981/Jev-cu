@@ -1,24 +1,7 @@
-# 日历导航演示（待运行方案）
+# 日曆示範
 
-目的：展示 Jev 根据真实界面选择控件，Computer Use 执行，Codex 读取结果核验。只改变视图和浏览日期，不创建或修改日程。
+本頁只在使用者明確選擇日曆測試時使用，不自動操作。
 
-建议先向用户说明：切到月视图 → 下个月 → 回到今天 → 切到周视图。结束停在本周；若用户要求恢复原视图，把恢复作为单独阶段。
+在 ChatGPT 桌面使用 GPT 與官方 Computer Use，確認 Calendar 的真實當前月份、切換按鈕及授權。依 runtime.md 用 runChatGPTTask 做2步以內的單一目標 dry-run，再於已授權範圍執行並驗收。
 
-## 阶段与核验
-
-| 阶段 | Jev 的目标 | 成功证据 |
-| --- | --- | --- |
-| 月视图 | Switch Calendar to Month view. | month-button 选中 |
-| 下个月 | Navigate to the calendar month immediately after the observed starting month. | 从阶段起点计算目标年月，标题与之匹配 |
-| 今天 | Return to today in Calendar. | 当前年月匹配，且活动日期或选中日期是本地今天；不只看 Today 按钮存在 |
-| 周视图 | Switch Calendar to Week view. | week-button 选中，显示范围包含今天 |
-
-运行前从新观测确定实际标签与状态格式，按本地日期计算目标。不要硬编码历史月份、AX 索引或示例日期。若日期状态无法从 AX 可靠读取，由 Codex 查看界面核验并注明，不把截图发送给 Jev。
-
-先预览一个实际需要执行的阶段。每阶段最多尝试 2–3 步，完成后才开始下一阶段。出现弹窗、用户改变界面或观察不到预期变化时，暂停该阶段并重新判断。
-
-## 记录
-
-保存每阶段目标、实际前后状态的必要摘要、轨迹路径、Jev 调用数、实际动作数、总耗时、核验结果和接管原因。不要保存无关日程正文。
-
-这是操作链路演示，不足以证明成本或速度优于其他方案。做对照实验时必须用相同起点和成功判据，并统计失败和接管。
+按鈕索引和月份不得从 fixtures 複製。沒有候選或官方 getAXState 介面則停止；不使用替代代理、瀏覽器 bridge 或自製 Windows driver。

@@ -1,37 +1,32 @@
-# 运行示例
+# ChatGPT 桌面官方工具 runtime 範例
 
-以下代码只在 `cua_repl` 中使用。首次调用先单独执行 `await cua.getApp("Calendar")`，阅读返回的工具文档；导入及循环放到后续调用。若当前接口与 driver 不匹配，停止并适配，不猜测 API。
+這些方法沿用原專案的 cua App contract，必須先對照**當次官方工具文件**。不是 OpenAI 對所有版本／平台的公開 SDK 保證。此段只在桌面工作階段真的提供 cua、Node ESM 與官方 App 方法時執行；普通 PowerShell、Node 終端和本聊天伺服器沒有這些能力。
+
+按官方文件先單獨綁定實際 App、取得其工具說明及授權，再於後續工具呼叫匯入：
 
 ```js
-var jevUrl = await import("node:url");
-var repoDir = "{{REPO_DIR}}"; // 安装 skill 时自动替换为本仓库路径
-var jevLoop = await import(jevUrl.pathToFileURL(
-  repoDir + "/scripts/loop.mjs"
-).href);
-
-// 先从当前 AX 确认实际使用的角色、标签、ID 和选中状态。
-// 此判据适用于已观测到 week-button / Value: 1 的 Calendar 界面。
-var weekSelected = ax => ax.split("\n").some(line =>
-  /radio button/.test(line) && /ID: week-button\b/.test(line) && /Value: 1\b/.test(line)
-);
-var jevResult = await jevLoop.runTask({
-  driver: jevLoop.createCuaDriver(cua),
-  appName: "Calendar",
-  goal: "Switch Calendar to Week view.",
-  dryRun: true,
-  maxSteps: 2,
-  verify: weekSelected,
-});
-nodeRepl.write(jevResult);
+var jevURL = await import('node:url');
+var jev = await import(jevURL.pathToFileURL('{{REPO_DIR}}/scripts/chatgpt-harness.mjs').href);
+// cua 必須是當前官方 Computer Use 提供的真實物件，不可自行建立。
+var capability = jev.inspectChatGPTRuntime(typeof cua === 'undefined' ? null : cua);
+// 這只是方法形狀檢查，不是證明已授權／來源可信。
 ```
 
-预览通过且动作已授权后，才改 `dryRun: false`。若一开始已是周视图，核验可以直接完成，不应为展示而重复点击。
+先從**真實當前觀察**確定目標，再設定單一任務；以下月份只是示意，不能照抄成虛構的已觀察內容：
 
-- `verify(ax)`：纯读取的总目标判据。每步之前和最后一步之后检查；不能只匹配按钮存在，要匹配选中状态或结果值。
-- `resources: { text, key, direction }`：Codex 提供的动作参数。需要动态参数时可使用无副作用回调；每步可能调用两次（决策前参数为 `null`，决策后为 decision）。
-- 不混用不同 `jevGoal` 来编排多阶段长任务：每个阶段单独调用并核验，再进入下一阶段。
-- 默认候选上限 40；扩大前检查是否是角色过滤或标签问题。
-- `cua_repl` 默认超时 30 秒，调用时长必须覆盖 API 和观测耗时；演示建议单阶段至多 2–3 步，工具超时可设为 60 秒。外层超时后先检查状态和轨迹，不能假设动作未发生。
-- `plan` 是提示，不是持久化执行进度。静态动作计划和 `skipJev` 不能用作 Jev 决策表现的证据。
+```js
+var result = await jev.runChatGPTTask({
+  cua,
+  appName: 'Calendar',
+  goal: 'Switch the visible calendar to the next month.',
+  dryRun: true,
+  maxSteps: 2,
+  // 由 GPT 依實際觀察設定；例如原頁為 September 2026 才用此判據。
+  verify: ax => ax.includes('October 2026'),
+});
+// 依當前 runtime 文件指定的方法顯示 result。
+```
 
-当前策略仍有按 App 放宽门槛和关键词误判的限制；不要把白名单或低风险分类理解为对该 App 所有写操作的授权。复杂输入、坐标拖拽与浏览器通道需独立验证。
+dry-run 通過且授權覆蓋後，才設定 dryRun:false。input text/key/direction 用 resources 明確給定；不可提供替換 driver/decide/thresholds/jevOptions。任務很長時 GPT 拆小目標；每次 maxSteps 上限30，預設候選最多40。
+
+若介面不同，不要把 screenshot JSON轉成假 AX，或改用 windows_* 工具。回報 `official_state_interface_unsupported`，由 GPT 依官方文件決定是否可在同一工具中接管；沒有可用官方工具就停下。

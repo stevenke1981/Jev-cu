@@ -1,90 +1,79 @@
-# Jev-cu v0.3.0
+# Jev-cu v0.4.0 — GPT + ChatGPT 桌面版 Computer Use
 
-**新增原生 Windows Computer Use**，保留原有 macOS Codex AX 流程與 OpenRouter Jev 1.13 串接。Windows 不需要 `cua_repl`，可由 Codex、Pi、AGY / Antigravity、OpenCode 或其他本機 MCP Agent 使用。
+本版依「macOS 原版 Harness 校正版」恢復四問流程，**GPT 是唯一主 Agent，桌面操作只使用 ChatGPT 桌面版官方 Computer Use**。不啟動 Pi、AGY、OpenCode，不使用自製 Windows UIA/SendInput、Python 桌面工具、瀏覽器 bridge 或另一個執行代理。
 
-Windows 路徑採用 **主 Agent 控制、Jev 只審查**：
+Jev 保留圖中的 `target / action / done / risk` 四問：它選候選元素與動作類型；GPT 提供目標、參數、限制與驗收。本地 harness 在 GPT 啟動的官方工具 runtime 內執行有界迴圈。**這不是後來的 ALLOW/DENY reviewer；`done >= 0.9` 不等於 `approve >= 0.9`。**
 
-```text
-主 Agent 觀察 Windows UIA／截圖 → 提出完整動作
-    → Jev ALLOW／DENY（不執行）
-    → 主 Agent 明確呼叫執行一次 → 重新觀察與驗收
+## 八步流程
+
+```mermaid
+flowchart TD
+  A[1 GPT 規劃目標、App、參數、限制與 verify] --> B[2 官方 Computer Use 讀完整 AX]
+  B --> V{有 verify 且已完成?}
+  V -- 是 --> Z[done / verified:true]
+  V -- 否 --> C[3 parseAX + selectCandidates 最多 40]
+  C --> N{候選至少 2 個?}
+  N -- 否 --> E[重讀一次；仍不足交回 GPT]
+  N -- 是 --> D[4 精簡 state + questions 文字]
+  D --> J[5 Jev: target / action / done / risk]
+  J --> P[6 normalizeDecision + 本地 Policy]
+  P -- proceed --> R{dryRun?}
+  R -- 是 --> DR[預覽後停止，不執行]
+  R -- 否 --> X[7 harness 呼叫官方 App 方法]
+  X --> O[8 讀新 AX、記錄、驗收]
+  O -- 尚未完成且有步數 --> B
+  O -- 完成 --> Z
+  P -- confirm / escalate / stop / error --> GPT[同一個 GPT 接管，不換後端]
 ```
 
-## Windows 開始使用
+精簡限制保留：上下文 1500 字元、每個候選描述 120 字元、最近 6 筆歷史；預設 dryRun=true、最多 30 步。門檻保留原 policy：risk >= 0.2 要確認、target confidence 一般 0.5／指定低風險 App 0.4、低於 0.3 停止。App 白名單不是對所有動作的授权。
 
-需要 Windows 10/11、原生 Windows Node.js 22+、內建 Windows PowerShell 5.1 / .NET Framework。不是 WSL 的 Linux Node；無需 Python 或額外 npm 套件。
+## 設定
+
+1. 在 ChatGPT 桌面版使用 GPT，進入 ChatGPT Work，安裝／啟用官方 Computer Use 的 server 與 skill，依官方流程授權目標 App。
+2. 將本 repository 作為本機專案資料夾開啟。Node.js 22+；沒有其他 npm 依賴。
+3. 在 repository 根目錄 `.env.local` 設定 `OPENROUTER_API_KEY`，不要貼到對話、日誌或提交 Git。這是 **Jev** 的金鑰，不是用 API 取代桌面版 GPT。
 
 ```powershell
-git clone https://github.com/stevenke1981/Jev-cu.git
-cd Jev-cu
-npm run windows:doctor
-node windows/cli.mjs list
+# 已在本專案 main 分支時
+git pull --ff-only origin main
+npm test
+npm run doctor
+npm run install-skill -- --force
 ```
 
-已有 clone 時，先確認在 `main` 再 `git pull --ff-only origin main`。
-
-在專案根目錄 `.env.local` 填入自己的 OpenRouter key，不要提交 Git，也不要覆蓋其他既有設定：
+安裝器只複製本專案 Skill 到 `~/.agents/skills/jev-use`，先備份到搜尋範圍以外的 `~/.agents/skill-backups`，不安裝官方插件、不修改任何權限／MCP 設定或金鑰。若偵測到舊 `~/.codex/skills/jev-use`，會回報但不擅自刪除；請在桌面版停用重複舊版。若目前 ChatGPT Work 不顯示本機 Skill，直接在已開啟的本機專案要求 GPT 讀取 `AGENTS.md` 與 `skill/jev-use/SKILL.md`，不要改用其他代理。
 
 ```dotenv
-OPENROUTER_API_KEY=你的OpenRouter金鑰
+OPENROUTER_API_KEY=your_openrouter_api_key
 ```
 
-環境變數優先。預設模型固定 `typesafe/jev-1.13`，API 是 `POST https://openrouter.ai/api/alpha/decisions`，使用 `state/questions`，不是 Chat Completions 的 `messages`。不沿用舊 `TYPESAFE_API_KEY`，不自動改用其他模型。金鑰不傳给原生 Windows worker。
+Jev 預設仍是 `typesafe/jev-1.13` / `https://openrouter.ai/api/alpha/decisions`。核心 `scripts/jev-decide.mjs` 和四問／Policy 保留；主要入口不接受替換 driver、模型或降門檻參數。
 
-### 各 Agent
+## 給 GPT 的啟動指令
 
-```powershell
-# Codex
-node windows/install.mjs codex
-node windows/cli.mjs config codex
+> 讀取本專案 AGENTS.md 和 skill/jev-use/SKILL.md。你是唯一主 Agent，只使用這個 ChatGPT 桌面工作階段的官方 Computer Use。按八步四問 harness 執行：你規劃並提供參數，Jev 選 target/action 並回 done/risk，本地 Policy 判斷，再由官方 Computer Use 執行和讀取結果。先核對當前官方工具文件與授權、先 dry-run；缺少元件或介面不相容就停止／交回你判讀，不使用任何其他桌面驅動、代理或瀏覽器 bridge。
 
-# AGY IDE（AGY CLI 的 Skill 安裝改用 agy-cli）
-node windows/install.mjs agy
-node windows/cli.mjs config agy
+具體 runtime 範例在 [runtime.md](skill/jev-use/references/runtime.md)。`npm run doctor` 只做本機配置檢查，**無法在一般終端建立或確認桌面版官方 Computer Use runtime**。沒有 `npm start` 桌面伺服器，也不要求另開 Codex CLI。
 
-# OpenCode
-node windows/install.mjs opencode
-node windows/cli.mjs config opencode
+## 平台及介面界線
 
-# Pi：原生 Extension 與 Skill；安裝後 /reload 或重開會話
-node windows/install.mjs pi
-```
+官方說明目前支援 macOS 與 Windows 的 ChatGPT 桌面 Computer Use；這不代表兩平台公開相同 JavaScript API。本版 adapter 採用原專案已知的 `cua.getApp()` / App.`getAXState()` 方法形狀，**必須先以當前官方工具回傳文件確認**；公共文件沒有保證這些方法跨平台永遠存在。沒有該介面會回 `official_computer_use_unavailable` / `official_state_interface_unsupported`，不偽造 AX 或回退自製驅動。
 
-只執行要使用的宿主。MCP 的 `config` 輸出使用 Node 與專案絕對路徑；將 **jev-windows 條目**合併至既有設定，不能整份覆蓋。Windows installer 預設不覆寫，更新加 `--force` 會先備份；舊 Pi 的 TypeBox 可用 `--legacy`。搬動 repository 後需重新產生設定／loader。
+Windows 官方 Computer Use 需前景且目標 App 可見。macOS 按官方要求啟用 Screen Recording / Accessibility。工具的實際方法、支援動作和安全規則以當次官方插件文件優先；本專案不自建、模仿或替換該插件。
 
-Jev-cu 與 Jev-ocu 都內含相同 Windows companion；**同一宿主只載入其中一份**，不要重複註冊或同時控制電腦。獨立 worker 使用隱藏子程序，不另外開啟 PowerShell 終端；沒有新增 GUI app。
+圖中的 AX-only 主線沒有內建「AX 不足就看圖找按鈕」自動 fallback。只有 CapCut 視窗、沒有候選時，交回同一 GPT，用官方 Computer Use 的實際截圖／工具處理；不能編造按鈕 ID、把 done 當 approve，或降低門檻硬過關。座標操作由 GPT 透過官方工具另行處理，本入口不允許 `resources.at` 覆蓋文字候選的目標。
 
-## Windows 功能
+## 從 v0.3.0 遷移
 
-`windows_info`、`windows_list`、`windows_observe`、`windows_screenshot`、`windows_review`、`windows_execute`、`windows_stop`。
+已從本分支移除 `windows/`、所有 `windows:*` npm 指令及自動匯入 Windows companion 的 workflow。只更新 **Jev-cu**，Jev-ocu 不在本次修改範圍。歷史版本仍可由 Git history 找回。
 
-實作原生 UIA 視窗／元件讀取、文字值與狀態、PNG 截圖、Invoke、Value、Toggle、Select、ScrollPattern、實體點擊、Unicode 文字、有限按鍵、聚焦、等待及有截圖雜湊驗證的座標點擊／拖曳。使用 DPI 實體螢幕座標，包括負的多螢幕原點；不是 CSS 或縮小預覽圖片座標。
+本機舊 MCP 設定不會被 git pull 自動更改：請停用之前的自製 `jev-windows` server 與其 Skill，避免它繼續被載入；**保留官方 Computer Use 插件**。不要再套用舊的 Windows v1.1.0 修正包到本版。本專案不代為修改宿主設定或你的其他專案。
 
-預設執行工具只做 dry-run；真實操作必須指定 `dryRun:false` 與該精確動作的 `reviewId`。Jev 核准不會自動產生滑鼠鍵盤動作。快照／核准最多 60 秒，執行前在 Windows worker 重新核對狀態；嘗試後消耗，不自動重播。模型錯誤、未核准、狀態改變或逾時均不放行；動作途中出錯可能回 `executed:"unknown"`，需先觀察。
+## 測試與限制
 
-截圖回給主 Agent，不送進 Jev；UIA 文字及動作文字仍會經 OpenRouter 傳到模型，必須事先縮小資料範圍。沒有自動 OCR、OmniParser 或完整隱私去識別功能。UIA 取決於 App 的提供者，不能保證每個畫布或瀏覽器元件都可讀。
+`npm test` 只跑離線測試：原四問／Policy／迴圈、官方 runtime adapter mock、GPT 入口完整流程 mock、安裝備份。它不操作真實桌面、不呼叫付費模型；跨平台 CI 通過也不表示真實 ChatGPT Work、CapCut 或每個 OS 的 runtime 已端到端驗收。
 
-詳見 [Windows 手冊](windows/README.md)、[動作格式](windows/ACTIONS.md)、[Windows Skill](windows/skill/SKILL.md)。不繞過 UAC／UIPI／鎖定／安全桌面，不自動提權，不修改全域執行原則。主 Agent 仍須遵守其既有權限；hostChecks 只是聲明，本程式不是不可繞過的 OS sandbox。
+`npm run p0 -- --limit 1` 仍是舊 AX 快照的**付費** Jev 選元素評測，不控制桌面、不是實際任務成功率。`runs/*.jsonl` 可能包含任務和決策內容，勿公開私人資料；URL 清理不是完整去識別。
 
-## 原有 macOS／Codex 路徑
-
-`scripts/loop.mjs` 的 `runTask/createCuaDriver`、`scripts/policy.mjs`、AX fixtures 和原有測試保持不變。這些是舊 macOS AX 路徑，**不要在 Windows 假造全域 cua 或直接啟動該自主迴圈**；Windows 使用上面的獨立 companion。
-
-```powershell
-npm run install-skill
-npm run uninstall-skill
-```
-
-上列保留舊 `jev-use` Skill 安裝方式，Windows 請使用 `node windows/install.mjs <agent>`。舊 macOS 執行範例見 [runtime.md](skill/jev-use/references/runtime.md)，只有真實存在且經授權的 `cua_repl` 環境才適用。仍預設 dry-run，敏感操作需確認，實際結果須核驗。
-
-## 驗證
-
-```powershell
-npm test
-npm run windows:test
-npm run p0 -- --limit 1
-```
-
-前兩個是離線測試；Windows 原生測試會建立自己的隔離 WinForms 視窗，測 UIA、繁體中文寫入、按鈕、截圖與舊快照阻擋，不操作其他 App、不呼叫模型。Linux/macOS 明確 skip 原生項目；無互動桌面時 GUI smoke 明確 skip。**`p0` 會呼叫付費 OpenRouter API**，只評測舊 AX 元素選擇，不代表 Windows 實際任务成功率。
-
-CI 涵蓋 Windows/Linux/macOS 與 Node 22/24；實際結果看 GitHub Actions，不把模擬測試或隔離視窗測試當成所有 Agent／App 的端到端驗收。Windows 共用原始碼來源固定記錄於 `.github/workflows/vendor-windows.yml`；只在明確更新該工作流或手動觸發時同步，沒有定時拉取最新程式。
+來源與版本對照：[docs/WORKFLOW.md](docs/WORKFLOW.md)、[docs/SOURCES.md](docs/SOURCES.md)。
