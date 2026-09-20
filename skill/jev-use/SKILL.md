@@ -16,9 +16,10 @@ Jev 负责从当前候选中选择目标与动作。Codex 负责拆分任务、�
 ## 环境与维护
 
 - 项目：本仓库根目录 `{{REPO_DIR}}`（含 `scripts/` 与 `skill/`；安装 skill 时自动替换为本地路径）。
-- 密钥：项目 `.env.local` 或环境变量 `TYPESAFE_API_KEY`；只检查是否存在，不输出值。
+- 密钥：项目 `.env.local` 或环境变量 `OPENROUTER_API_KEY`；只检查是否存在，不输出值。不自动读取旧 `TYPESAFE_API_KEY`。
+- API：`POST https://openrouter.ai/api/alpha/decisions`；默认模型固定为 `typesafe/jev-1.13`。使用 `state` / `questions`，不是 Chat Completions；失败时不切回 TypeSafe 或其他模型。
 - 实现：`scripts/loop.mjs`（循环）、`scripts/jev-decide.mjs`（决策）、`scripts/policy.mjs`（门槛）。
-- 技能源文件：项目 `skill/jev-use/`。修改后运行 `node scripts/install-skill.mjs` 同步到已安装目录；不要维护两套正文。
+- 技能源文件：项目 `skill/jev-use/`。修改后运行 `node scripts/install-skill.mjs` 同步到已安装目录；不要维护两套正文。升级 API 配置后开启新会话，避免旧模块缓存。
 - 执行前读取当前 `cua_repl` 返回的文档。首次调用只做一个入口调用，例如 `await cua.getApp("Calendar")`；后续调用才导入项目模块。当前工具文档优先于旧示例，不修改官方插件文件。
 
 ## 执行流程

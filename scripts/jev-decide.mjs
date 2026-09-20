@@ -1,9 +1,9 @@
 #!/usr/bin/env node
 /**
- * Jev 决策封装（直连 TypeSafe API）。
+ * Jev 决策封装（OpenRouter Decisions API）。
  *
- * - 读取 key：环境变量 TYPESAFE_API_KEY，或项目根目录 .env.local
- * - ask()   ：发一次 systemone 请求（可并发多问）
+ * - 读取 key：环境变量 OPENROUTER_API_KEY，或项目根目录 .env.local
+ * - ask()   ：发一次 Decisions 请求（可并发多问）
  * - decide()：Computer Use 循环用的标准四问（target/action/done/risk）
  *
  * CLI（调试用）：
@@ -16,22 +16,26 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const PROJECT_DIR = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 
-export const DEFAULT_ENDPOINT = "https://api.typesafe.ai/v1/systemone";
-export const DEFAULT_MODEL = "jev-latest";
-/** 官方价：$42/Btok = $0.042/Mtok 输入；输出免费 */
+export const DEFAULT_ENDPOINT = "https://openrouter.ai/api/alpha/decisions";
+export const DEFAULT_MODEL = "typesafe/jev-1.13";
+/** Jev 1.13 估算价（2026-09-20）：$0.042/Mtok 输入；优先使用 usage.cost。 */
 export const PRICE_PER_INPUT_TOKEN_USD = 0.042 / 1e6;
 
 export function loadApiKey({
-  envVar = "TYPESAFE_API_KEY",
+  envVar = "OPENROUTER_API_KEY",
   envFile = path.join(PROJECT_DIR, ".env.local"),
 } = {}) {
   const env = globalThis.process?.env ?? {};
-  if (env[envVar]) return String(env[envVar]).trim();
+  const envKey = String(env[envVar] ?? "").trim();
+  if (envKey) return envKey;
   try {
     const text = fs.readFileSync(envFile, "utf8");
     for (const line of text.split("\n")) {
       const m = line.match(/^\s*([A-Za-z_][A-Za-z0-9_]*)\s*=\s*(.*?)\s*$/);
-      if (m && m[1] === envVar) return m[2].replace(/^['"]|['"]$/g, "").trim();
+      if (m && m[1] === envVar) {
+        const key = m[2].replace(/^['"]|['"]$/g, "").trim();
+        if (key) return key;
+      }
     }
   } catch {
     /* 文件不存在时走统一报错 */
@@ -40,8 +44,10 @@ export function loadApiKey({
 }
 
 export function estimateCostUsd(usage = {}) {
-  const tokens = usage.input_tokens ?? usage.inputTokens ?? 0;
-  return tokens * PRICE_PER_INPUT_TOKEN_USD;
+  const cost = toNumber(usage?.cost);
+  if (cost != null && cost >= 0) return cost;
+  const tokens = toNumber(usage?.input_tokens ?? usage?.inputTokens ?? 0);
+  return tokens != null && tokens >= 0 ? tokens * PRICE_PER_INPUT_TOKEN_USD : 0;
 }
 
 function toNumber(value) {
@@ -131,7 +137,8 @@ export async function ask({
   timeoutMs = 60_000,
   fetchImpl = fetch,
 }) {
-  const key = apiKey ?? loadApiKey();
+  const key = String(apiKey ?? loadApiKey()).trim();
+  if (!key) throw new Error("OPENROUTER_API_KEY 不能为空");
   const backoff = [1_000, 3_000, 8_000];
 
   for (let attempt = 0; ; attempt++) {
@@ -139,6 +146,7 @@ export async function ask({
     const timer = setTimeout(() => controller.abort(), timeoutMs);
     const startedAt = Date.now();
     let res;
+    let body;
     try {
       res = await fetchImpl(endpoint, {
         method: "POST",
@@ -146,13 +154,16 @@ export async function ask({
         body: JSON.stringify({ state, model, questions }),
         signal: controller.signal,
       });
+      body = await res.json().catch((err) => {
+        if (controller.signal.aborted) throw err;
+        return null;
+      });
     } finally {
       clearTimeout(timer);
     }
     const latencyMs = Date.now() - startedAt;
-    const body = await res.json().catch(() => null);
 
-    if (res.ok && body?.answers) {
+    if (res.ok && body?.answers && typeof body.answers === "object" && !Array.isArray(body.answers)) {
       return {
         answers: body.answers,
         usage: body.usage ?? {},
@@ -165,8 +176,10 @@ export async function ask({
 
     const retryable = res.status === 429 || res.status >= 500;
     if (!retryable || attempt >= maxRetries) {
-      const message = body?.detail?.message ?? body?.error?.message ?? JSON.stringify(body)?.slice(0, 200) ?? res.statusText;
-      const err = new Error(`Jev 调用失败 HTTP ${res.status}（${latencyMs}ms）：${message}`);
+      const detail = body?.detail?.message ?? body?.error?.message ??
+        (res.ok ? "无效的 Decisions 响应（缺少 answers 对象）" : res.statusText);
+      const message = String(detail ?? "未知错误").replaceAll(key, "[REDACTED]").slice(0, 200);
+      const err = new Error(`OpenRouter Jev 调用失败 HTTP ${res.status}（${latencyMs}ms）：${message}`);
       err.status = res.status;
       throw err;
     }
