@@ -5,13 +5,13 @@
 | 圖中階段 | 本版落點 |
 |---|---|
 | 1 主 Agent 規劃 | GPT / runChatGPTTask 的 goal, appName, resources, plan, constraints, verify |
-| 2 讀完整 AX | chatgpt-driver.mjs -> 真實官方 cua.getApp / App.getAXState |
+| 2 讀完整 AX | chatgpt-driver.mjs -> 官方 cua；windows-driver.mjs -> 官方 sky.get_window_state 的 accessibility.tree |
 | 3 候選 | 原 loop.mjs 的 parseAX/selectCandidates；<=40 |
 | 4 精簡文字 | 原 jev-decide.mjs 的 decide/buildQuestions/sanitizeLabel |
 | 5 四問 | target/action/done/risk；confidence 屬 target，不是 approve |
 | 6 本地 Policy | 原 policy.mjs，門檻沒有降低 |
-| 7 官方工具執行 | runTask -> GPT專用 driver -> 官方 App；dry-run 不執行 |
-| 8 新 AX 與驗收 | 原 loop.mjs；verify 通過才有 verified:true |
+| 7 官方工具執行 | cua 沿用 runTask；Windows 先 prepareWindowsStep，GPT 檢視後在另一個工具呼叫 executeWindowsStep；dry-run 不執行 |
+| 8 新 AX 與驗收 | 每次動作後立即重讀；verify 通過才有 verified:true。Windows 單步完成不等於整體完成 |
 
 原 loop.mjs、policy.mjs、jev-decide.mjs 與原36項測試保留，供對照原始設計。底層歷史註解中的 Codex/cua_repl 是來源用語，不代表本版要求啟動額外 Codex CLI 代理。
 

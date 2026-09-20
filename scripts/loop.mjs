@@ -288,6 +288,7 @@ export async function runTask({
       return finish("dry_run", {
         steps: 0,
         tracePath,
+        decision: stripRaw(decision),
         planned: { action: decision.action, targetIndex: decision.targetIndex, targetLabel: decision.targetLabel },
         gate,
         elapsedMs: Date.now() - startedAt,

@@ -1,16 +1,23 @@
 import { runTask } from './loop.mjs';
 import { createChatGPTDriver, ComputerUseRuntimeError, RUNTIME_SOURCE } from './chatgpt-driver.mjs';
+import { prepareWindowsStep } from './windows-harness.mjs';
+import { VERSION } from './version.mjs';
+export { VERSION } from './version.mjs';
+export { inspectWindowsRuntime } from './windows-driver.mjs';
+export { executeWindowsStep } from './windows-harness.mjs';
 export { inspectChatGPTRuntime } from './chatgpt-driver.mjs';
-export const VERSION = '0.4.0';
 
 /** GPT is the sole planner/owner. Jev retains target/action/done/risk selection.
  * The original bounded loop is invoked inside the official desktop tool runtime.
  * This entry does not create that runtime and cannot run from ordinary Node alone.
  */
 export async function runChatGPTTask(input = {}) {
-  const allowed = new Set(['cua', 'appName', 'goal', 'dryRun', 'maxSteps', 'candidateMax', 'allowedApps', 'resources', 'constraints', 'plan', 'verify', 'emit', 'traceDir', 'traceId', 'signal']);
+  const allowed = new Set(['cua', 'sky', 'windowId', 'appName', 'goal', 'dryRun', 'maxSteps', 'candidateMax', 'allowedApps', 'resources', 'constraints', 'plan', 'verify', 'emit', 'traceDir', 'traceId', 'signal']);
   for (const key of Object.keys(input)) if (!allowed.has(key)) throw new Error(`Unsupported option: ${key}. Alternate drivers, model overrides and policy-threshold overrides are not accepted by this entry.`);
-  const { cua, signal, resources = {}, ...options } = input;
+  const { cua, sky, windowId, signal, resources = {}, ...options } = input;
+  if (cua != null && sky != null) throw new Error('Choose one official runtime: cua or sky.');
+  if (sky == null && windowId !== undefined) throw new Error('windowId requires sky.');
+  if (sky != null && options.maxSteps !== undefined && options.maxSteps !== 1) throw new Error('Windows requires maxSteps: 1; inspect each proposal in a separate tool cell.');
   if (typeof options.appName !== 'string' || !options.appName.trim() || typeof options.goal !== 'string' || !options.goal.trim()) throw new Error('appName and goal are required');
   if (options.dryRun !== undefined && typeof options.dryRun !== 'boolean') throw new Error('dryRun must be boolean');
   for (const [key, max] of [['maxSteps', 30], ['candidateMax', 40]]) {
@@ -32,6 +39,7 @@ export async function runChatGPTTask(input = {}) {
   };
   let dispatchedActions = 0;
   try {
+    if (sky != null) return await prepareWindowsStep({ ...options, sky, windowId, signal, resources: checkedResources });
     const driver = createChatGPTDriver(cua, { signal });
     const guarded = { ...driver };
     for (const name of ['click', 'drag', 'setValue', 'typeText', 'pressKey', 'scroll']) {

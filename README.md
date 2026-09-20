@@ -1,4 +1,6 @@
-# Jev-cu v0.4.0 — GPT + ChatGPT 桌面版 Computer Use
+# Jev-cu v0.5.0 — GPT + ChatGPT 桌面版 Computer Use
+
+v0.5.0 新增目前 Windows 官方 `@oai/sky` 介面：精確選取單一視窗、直接讀取官方文字樹、依原有 Jev 四問與 Policy 提出一步，再由 GPT 在下一次工具呼叫執行並驗收。`runChatGPTTask({ sky, ... })` 預設只預覽；`dryRun:false` 回傳 `awaiting_review`，檢視後以 `executeWindowsStep(proposal)` 執行一次。使用範例見 [runtime.md](skill/jev-use/references/runtime.md)。原 `cua` 入口保留。
 
 本版依「macOS 原版 Harness 校正版」恢復四問流程，**GPT 是唯一主 Agent，桌面操作只使用 ChatGPT 桌面版官方 Computer Use**。不啟動 Pi、AGY、OpenCode，不使用自製 Windows UIA/SendInput、Python 桌面工具、瀏覽器 bridge 或另一個執行代理。
 
@@ -26,7 +28,7 @@ flowchart TD
   P -- confirm / escalate / stop / error --> GPT[同一個 GPT 接管，不換後端]
 ```
 
-精簡限制保留：上下文 1500 字元、每個候選描述 120 字元、最近 6 筆歷史；預設 dryRun=true、最多 30 步。門檻保留原 policy：risk >= 0.2 要確認、target confidence 一般 0.5／指定低風險 App 0.4、低於 0.3 停止。App 白名單不是對所有動作的授权。
+精簡限制保留：上下文 1500 字元、每個候選描述 120 字元；預設 dryRun=true。舊 cua 迴圈最多30步、最近6筆歷史。Windows 依官方文件分兩次工具呼叫，每次只準備／執行1步，GPT 以 plan/constraints 帶入必要進度。門檻保留原 policy：risk >= 0.2 要確認、target confidence 一般 0.5／指定低風險 App 0.4、低於 0.3 停止。App 白名單不是對所有動作的授權。
 
 ## 設定
 
@@ -58,7 +60,9 @@ Jev 預設仍是 `typesafe/jev-1.13` / `https://openrouter.ai/api/alpha/decision
 
 ## 平台及介面界線
 
-官方說明目前支援 macOS 與 Windows 的 ChatGPT 桌面 Computer Use；這不代表兩平台公開相同 JavaScript API。本版 adapter 採用原專案已知的 `cua.getApp()` / App.`getAXState()` 方法形狀，**必須先以當前官方工具回傳文件確認**；公共文件沒有保證這些方法跨平台永遠存在。沒有該介面會回 `official_computer_use_unavailable` / `official_state_interface_unsupported`，不偽造 AX 或回退自製驅動。
+官方說明目前支援 macOS 與 Windows 的 ChatGPT 桌面 Computer Use；兩平台介面不同。本版支援原 `cua.getApp()` / App.`getAXState()` 與 Windows 官方 `sky.list_apps()` / `sky.get_window_state()`。Windows 不重新編號、不以截圖或 document_text 拼造候選；缺少 accessibility.tree 時交回 GPT。**仍須以當次官方工具文件確認介面及授權**，不偽造 AX 或回退自製驅動。
+
+Windows 以 `appName` 精確匹配官方 app id 或 displayName，多視窗時指定官方回傳的 `windowId`；不會自動挑第一個或自動開 App。支持元素點擊、set_value、已確認焦點的 type_text 與明確按鍵。捲動需座標、拖曳及其他視覺操作交回 GPT；不以按鍵偷偷替代。提案綁定真實觀察、不可重播、兩分鐘後過期；人工／其他工具改變畫面後須重新準備。尚未通過驗收時回 `step_complete`，不能視為任務完成。
 
 Windows 官方 Computer Use 需前景且目標 App 可見。macOS 按官方要求啟用 Screen Recording / Accessibility。工具的實際方法、支援動作和安全規則以當次官方插件文件優先；本專案不自建、模仿或替換該插件。
 

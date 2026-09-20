@@ -1,4 +1,4 @@
-# Jev-cu project contract — v0.4.0
+# Jev-cu project contract — v0.5.0
 
 Use GPT in the current ChatGPT desktop session as the sole planner and owner. Read skill/jev-use/SKILL.md and the current official Computer Use tool documentation before desktop actions.
 
@@ -8,7 +8,9 @@ Keep the corrected original workflow: plan -> full AX -> select <=40 candidates 
 
 The user entry is scripts/chatgpt-harness.mjs:runChatGPTTask. scripts/loop.mjs retains the original core for compatibility and regression testing; do not bypass the GPT entry's restrictions by invoking raw executor internals. Mock objects and injected decision functions belong only in offline tests.
 
-The current host must actually expose the documented cua App interface. Method-shape checks are not proof of OpenAI provenance or authorization. Never fake the runtime, AX, IDs, screenshots or completion; missing capabilities require stopping or GPT takeover through the same official tool.
+The current host must actually expose either the documented cua App interface or the official Windows @oai/sky window2 interface. Method-shape checks are not proof of OpenAI provenance or authorization. Never fake the runtime, AX, IDs, screenshots or completion; missing capabilities require stopping or GPT takeover through the same official tool.
+
+Windows uses runChatGPTTask({ sky, ... }) to observe and propose, then executeWindowsStep(proposal) in a separate tool cell AFTER GPT inspects the emitted observation and planned action. Each call prepares at most one step; never put these two calls in one cell or an automatic loop. Preserve exact official accessibility.tree text and returned window identities. Reprepare after interleaving/UI changes; single-use proposals expire after two minutes. Do not execute confirm/escalate results. Coordinate scrolling/dragging remain GPT takeover through the same official tool.
 
 No policy lowering, no implicit input text/key, no target override through coordinates. Preserve official app permissions, required confirmations and scope. Do not use the GUI to automate terminal apps, ChatGPT itself or security prompts contrary to official plugin restrictions. Jev receives minimized text only, never raw screenshots or credentials.
 

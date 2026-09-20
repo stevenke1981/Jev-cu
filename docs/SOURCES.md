@@ -1,5 +1,7 @@
 # 來源（2026-09-20）
 
+v0.5.0 Windows 介面依據：本機官方 computer-use 插件 26.915.31945 的 `skills/computer-use/SKILL.md`、`docs/api.md`、`docs/guidance.md`、`docs/confirmations.md`。使用 `@oai/sky` window2 API，保留 `accessibility.tree`；依 guidance 的 two-cell loop 將觀察檢視與單一動作分隔，沒有自行啟動 Windows helper。此版本由 v0.4.0 commit `340f98d4a9162437d60131b25051be300a7d7977` 修改。
+
 專案基準：stevenke1981/Jev-cu f68fbe5b8642f7ac64f3bea9866346e1e0085be6。
 原四問 harness：a8e9098474111e15b0143efd31350ae85fc9491d，scripts/loop.mjs、scripts/jev-decide.mjs、scripts/policy.mjs。
 
