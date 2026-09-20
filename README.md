@@ -82,7 +82,9 @@ Windows 官方 Computer Use 需前景且目標 App 可見。macOS 按官方要�
 
 ## 測試與限制
 
-實機檢查（2026-09-20）：Windows 繁體中文小畫家可啟動並讀取控制項；修正前候選不足，修正後可以產生候選。這次官方 runtime 對 OpenRouter 連線回報 `EACCES`，尚未完成 Jev 真實決策與操作的端到端驗收。金鑰存在不表示連線或金鑰有效。遇到這類錯誤應停止該決策步驟，交回 GPT 說明限制；不得改用其他網路通道繞過宿主限制。
+實機檢查（2026-09-20，Codex 桌面版／Windows 繁體中文小畫家）：修正 Windows 介面與中文候選解析後，先遇到執行環境網路拒絕 `EACCES`；網路開放後收到 OpenRouter HTTP 404，完整錯誤指出模型被 guardrail 排除。更新並同步 API Key 後，實際 Decisions API 請求收到 HTTP 200，Jev 成功選擇「最大化」，經 GPT 檢視提案後由官方工具執行並重新觀察成功。這驗證了一個真實桌面步驟，並非所有應用或完整任務均已通過。
+
+後續小畫家座標繪圖由 GPT 透過同一官方工具接管；使用者按實體 Escape 中止時立即停止，圖片尚未完成儲存。因此不能把這次繪圖記為完整任務成功。安裝後問題、原因判別、金鑰更新步驟與驗收界線見 [疑難排解與實機紀錄](docs/TROUBLESHOOTING.md)。
 
 `npm test` 只跑離線測試：原四問／Policy／迴圈、官方 runtime adapter mock、GPT 入口完整流程 mock、安裝備份。它不操作真實桌面、不呼叫付費模型；跨平台 CI 通過也不表示真實 ChatGPT Work、CapCut 或每個 OS 的 runtime 已端到端驗收。
 
